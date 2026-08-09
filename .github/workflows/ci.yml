@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - dev
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+# Permissions nécessaires pour que l'action de rapport de tests puisse publier ses résultats sur le workflow GitHub
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  test:
+    name: Test (${{ matrix.project }})
+    runs-on: ubuntu-latest
+
+    # La matrice exécute ce job une fois par dossier de projet.
+    # fail-fast: false permet aux deux jobs de tourner jusqu'au bout
+    # même si l'un des deux échoue (utile pour voir les deux rapports).
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [Angular, Java]
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      
+      # Détection automatique du type de projet (frontend/backend)
+      
+      - name: Détecter le type de projet
+        id: detect
+        working-directory: ${{ matrix.project }}
+        run: |
+          if [ -f package.json ]; then
+            echo "type=frontend" >> "$GITHUB_OUTPUT"
+          elif [ -f build.gradle ]; then
+            echo "type=backend" >> "$GITHUB_OUTPUT"
+          else
+            echo "Type de projet non reconnu dans ${{ matrix.project }}" >&2
+            exit 1
+          fi
+
+     
+      # Setup + cache spécifiques au frontend (condition sur le type détecté)
+      
+      - name: Setup Node.js
+        if: steps.detect.outputs.type == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+
+      - name: Installer les dépendances npm
+        if: steps.detect.outputs.type == 'frontend'
+        working-directory: ${{ matrix.project }}
+        run: npm ci --cache .npm --prefer-offline
+
+      
+      # Setup + cache spécifiques au backend
+     
+      - name: Setup JDK
+        if: steps.detect.outputs.type == 'backend'
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: 'gradle'
+
+      
+      # Exécution des tests via  script unifié
+     
+      - name: Exécuter les tests
+        run: |
+          chmod +x run-tests.sh
+          ./run-tests.sh ${{ matrix.project }}
+
+     
+      # Publication du rapport JUnit dans l'interface GitHub Actions
+     
+    
+      - name: Publier le rapport de tests
+        if: always()
+        uses: mikepenz/action-junit-report@v4
+        with:
+          report_paths: 'test-results/${{ matrix.project }}/*.xml'
+          check_name: "Résultats des tests - ${{ matrix.project }}"
