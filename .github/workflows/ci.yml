@@ -95,3 +95,60 @@ jobs:
         with:
           report_paths: 'test-results/${{ matrix.project }}/*.xml'
           check_name: "Résultats des tests - ${{ matrix.project }}"
+
+
+
+  build:
+    name: Build & Push (${{ matrix.project }})
+    needs: test
+    runs-on: ubuntu-latest
+
+    # Nécessaire pour pouvoir pousser une image vers ghcr.io avec le
+    # token automatique GITHUB_TOKEN (pas besoin de créer un secret manuel).
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [Angular, Java]
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
+      
+      # Calcul des variables : nom d'image (minuscules obligatoires
+      # pour ghcr.io) et tag "branche-sha" demandé par l'exercice
+     
+      - name: Calculer le nom d'image et le tag
+        id: meta
+        run: |
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_LOWER=$(echo "${{ matrix.project }}" | tr '[:upper:]' '[:lower:]')
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          BRANCH_SAFE=$(echo "${{ github.ref_name }}" | tr '/' '-')
+
+          echo "owner=$OWNER_LOWER" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE_LOWER" >> "$GITHUB_OUTPUT"
+          echo "tag=${BRANCH_SAFE}-${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Connexion à GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build et push de l'image Docker
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.project }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+
+      - name: Afficher le tag publié
+        run: |
+          echo "Image publiée : ghcr.io/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}"
