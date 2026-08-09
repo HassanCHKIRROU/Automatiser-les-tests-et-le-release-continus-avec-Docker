@@ -152,3 +152,107 @@ jobs:
       - name: Afficher le tag publié
         run: |
           echo "Image publiée : ghcr.io/${{ steps.meta.outputs.owner }}/${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}"
+
+
+
+
+
+
+    
+  release:
+    name: Release
+    needs: build
+    # Une release ne doit sortir que depuis main, jamais depuis dev
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+
+    # contents:write -> pour créer le tag Git + committer version/changelog
+    # issues/pull-requests:write -> requis par @semantic-release/github pour
+    #   commenter automatiquement les issues/PR liées aux commits publiés
+    # packages:write -> pour retagger l'image Docker avec le numéro de version
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+      packages: write
+
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+        with:
+          # fetch-depth: 0 = récupère tout l'historique Git, indispensable
+          # pour que semantic-release puisse analyser tous les commits
+          # depuis le dernier tag
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19.0'
+
+      - name: Connexion à GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Calculer les variables communes
+        id: meta
+        run: |
+          OWNER_LOWER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          SHA_SHORT=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "owner=$OWNER_LOWER" >> "$GITHUB_OUTPUT"
+          echo "source_tag=main-${SHA_SHORT}" >> "$GITHUB_OUTPUT"
+
+      
+      # Release du frontend Angular
+      # ---------------------------------------------------------
+      - name: semantic-release (Angular)
+        working-directory: Angular
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx --yes \
+            -p semantic-release \
+            -p @semantic-release/changelog \
+            -p @semantic-release/git \
+            -p @semantic-release/github \
+            -p @semantic-release/exec \
+            -p @semantic-release/npm \
+            semantic-release
+
+      - name: Retagger l'image Angular avec la version sémantique
+        if: hashFiles('angular-version.txt') != ''
+        run: |
+          VERSION=$(cat angular-version.txt)
+          echo "Nouvelle version Angular : $VERSION"
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ steps.meta.outputs.owner }}/angular:${VERSION} \
+            ghcr.io/${{ steps.meta.outputs.owner }}/angular:${{ steps.meta.outputs.source_tag }}
+
+      
+      # Release du backend Java
+      # ---------------------------------------------------------
+      - name: semantic-release (Java)
+        working-directory: Java
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npx --yes \
+            -p semantic-release \
+            -p @semantic-release/changelog \
+            -p @semantic-release/git \
+            -p @semantic-release/github \
+            -p @semantic-release/exec \
+            semantic-release
+
+      - name: Retagger l'image Java avec la version sémantique
+        if: hashFiles('java-version.txt') != ''
+        run: |
+          VERSION=$(cat java-version.txt)
+          echo "Nouvelle version Java : $VERSION"
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ steps.meta.outputs.owner }}/java:${VERSION} \
+            ghcr.io/${{ steps.meta.outputs.owner }}/java:${{ steps.meta.outputs.source_tag }}      
