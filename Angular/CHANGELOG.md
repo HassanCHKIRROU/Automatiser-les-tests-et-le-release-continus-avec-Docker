@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/HassanCHKIRROU/Automatiser-les-tests-et-le-release-continus-avec-Docker/compare/angular-v1.0.1...angular-v1.0.2) (2026-08-26)
+
+
+### Bug Fixes
+
+* tester release Angular uniquement ([23ae1bb](https://github.com/HassanCHKIRROU/Automatiser-les-tests-et-le-release-continus-avec-Docker/commit/23ae1bbca3088367852dc38ed79cc830b7fd152b))
+
 ## [1.0.1](https://github.com/HassanCHKIRROU/Automatiser-les-tests-et-le-release-continus-avec-Docker/compare/angular-v1.0.0...angular-v1.0.1) (2026-08-26)
 
 
