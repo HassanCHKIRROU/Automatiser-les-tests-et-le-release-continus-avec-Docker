@@ -1,6 +1,6 @@
-# ===============================
-# STAGE 1 : build de l'application Angular
-# ===============================
+
+#  1 : build de l'application Angular
+
 FROM node:20.19.0-alpine AS build
 
 # Dossier de travail dans le conteneur de build
@@ -20,9 +20,9 @@ COPY . .
 # Build de production Angular (génère dist/olympic-games-starter/browser)
 RUN npm run build
 
-# ===============================
-# STAGE 2 : image finale, Nginx qui sert les fichiers statiques
-# ===============================
+
+#  2 : image finale, Nginx qui sert les fichiers statiques
+
 FROM nginx:1.27-alpine
 
 # On remplace la config Nginx par défaut par la nôtre

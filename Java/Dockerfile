@@ -29,7 +29,7 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-COPY --from=build /build/build/libs/workshop-organizer-0.2.4.war app.war
+COPY --from=build /build/build/libs/workshop-organizer-*.war app.war
 
 EXPOSE 8080
 
