@@ -25,6 +25,7 @@ RUN npm run build
 
 FROM nginx:1.27-alpine
 
+
 # On remplace la config Nginx par défaut par la nôtre
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 
